@@ -1,0 +1,77 @@
+#Pacotes utilizados
+pacotes <- c("plotly","tidyverse","ggrepel","fastDummies","knitr","kableExtra",
+             "splines","reshape2","PerformanceAnalytics","metan","correlation",
+             "see","ggraph","nortest","rgl","car","olsrr","jtools","ggstance",
+             "magick","cowplot","beepr","Rcpp")
+
+if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
+  instalador <- pacotes[!pacotes %in% installed.packages()]
+  for(i in 1:length(instalador)) {
+    install.packages(instalador, dependencies = T)
+    break()}
+  sapply(pacotes, require, character = T) 
+} else {
+  sapply(pacotes, require, character = T) 
+}
+
+
+
+
+load(file = "analise_abandono.xlsx")
+
+#################################################################################
+#                            PROCEDIMENTO N-1 DUMMIES                           #
+#################################################################################
+#Dummizando a variável regiao. O código abaixo, automaticamente, fará: a) o
+#estabelecimento de dummies que representarão cada uma das regiões da base de 
+#dados; b)removerá a variável dummizada original; c) estabelecerá como categoria 
+#de referência a dummy mais frequente.
+
+abandono_dummies <- dummy_columns(.data = analise_abandono,
+                                   select_columns = "dep_administrativa",
+                                   remove_selected_columns = T,
+                                   remove_most_frequent_dummy = T)
+
+#Visualizando a base de dados dummizada
+abandono_dummies %>%
+  kable() %>%
+  kable_styling(bootstrap_options = "striped", 
+                full_width = F, 
+                font_size = 16)
+
+##################################################################################
+#                        ESTIMAÇÃO DO MODELO DE REGRESSÃO                        #
+##################################################################################
+
+#Modelagem com todas as variáveis
+modelo_abandono_dummies <- lm(taxa_abandono ~ . - nome_entidade, abandono_dummies)
+
+#Parâmetros do modelo_corrupcao_dummies
+summary(modelo_abandono_dummies)
+
+#Plotando o modelo_corrupcao_dummies de forma interpolada
+my_plot_abandono <- 
+  analise_abandono %>%
+  mutate(rotulo = paste(nome_entidade, taxa_abandono)) %>%
+  ggplot(aes(x = as.numeric(dep_administrativa), y = taxa_abandono, label = rotulo)) +
+  geom_point(color = "#FDE725FF") +
+  stat_smooth(aes(color = "Fitted Values"),
+              method = "lm", 
+              formula = y ~ bs(x, df = 2)) +
+  labs(x = "Dependencia Administrativa",
+       y = "Taxa de Abandono nos anos finais do ensino fundamental") +
+  scale_x_discrete(labels = c("1" = "Municipal", 
+                              "2" = "Estadual", 
+                              "3" = "Privada")) +
+  scale_color_manual("Legenda:",
+                     values = "#440154FF") +
+  geom_text_repel() +
+ 
+ theme_bw()
+my_plot_abandono
+
+summ(modelo_abandono_dummies, confint = T, digits = 4, ci.width = .95)
+export_summs(modelo_abandono_dummies, scale = F, digits = 4)
+
+confint(modelo_abandono_dummies, level = 0.95)
+ex
